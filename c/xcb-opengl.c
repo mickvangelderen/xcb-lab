@@ -110,14 +110,24 @@ int main_loop(Display *display, xcb_connection_t *connection,
         Instant update_start = time_now();
         xcb_generic_event_t *event;
         while ((event = xcb_poll_for_event(connection))) {
-            // NOTE(mickvangelderen): Used to mask by & ~0x80, not sure why.
-            switch (event->response_type) {
+            // NOTE(mickvangelderen): The most significant bit in this code is
+            // set if the event was generated from a SendEvent request.
+            switch (event->response_type & ~(1 << 7)) {
             case XCB_KEY_PRESS:
                 /* Quit on key press */
                 running = 0;
                 break;
             case XCB_EXPOSE:
                 // We are drawing continuously.
+                break;
+            case XCB_REPARENT_NOTIFY:
+                printf("XCB_REPARENT_NOTIFY\n");
+                break;
+            case XCB_CONFIGURE_NOTIFY:
+                printf("XCB_CONFIGURE_NOTIFY\n");
+                break;
+            case XCB_MAP_NOTIFY:
+                printf("XCB_MAP_NOTIFY\n");
                 break;
             case XCB_CLIENT_MESSAGE: {
                 // FIXME(mickvangelderen): Not getting any of these :'(
@@ -131,8 +141,8 @@ int main_loop(Display *display, xcb_connection_t *connection,
                 break;
             }
             default:
-                printf("event %d\n", event->response_type);
-                /* abort(); */
+                printf("UNKNOWN EVENT %d\n", event->response_type);
+                abort();
                 break;
             }
 
@@ -152,10 +162,10 @@ int main_loop(Display *display, xcb_connection_t *connection,
         frame_start = frame_end;
 
         if (duration_nsec(frame_elapsed) < 10000) {
-            // NOTE(mick): I can't figure out how to get a close event and
-            // properly stop the loop when the close button on the window is
-            // clicked. If the frame is suddenly super short it is probably not
-            // actually updating and drawing anymore.
+            // NOTE(mick): I can't figure out how to get a close event
+            // and properly stop the loop when the close button on the
+            // window is clicked. If the frame is suddenly super short
+            // it is probably not actually updating and drawing anymore.
             /* abort(); */
         }
 
