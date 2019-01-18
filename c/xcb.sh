@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-# https://www.x.org/releases/X11R7.7/doc/libxcb/tutorial/index.html
+# https://marc.info/?l=freedesktop-xcb&m=129381953404497
 clang xcb.c -o xcb -lX11 -lxcb -Weverything
 ./xcb
 rm xcb
