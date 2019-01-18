@@ -216,8 +216,8 @@ int setup_and_run(Display *display, xcb_connection_t *connection,
     // NOTE(mick): Don't know if this'll work.
     {
         Atom protocols[] = {wm_delete_window};
-        XSetWMProtocols(display, window, protocols,
-                        sizeof(protocols) / sizeof(Atom));
+        const int protocols_len = sizeof(protocols) / sizeof(Atom);
+        XSetWMProtocols(display, window, protocols, protocols_len);
     }
 
     // NOTE: window must be mapped before glXMakeContextCurrent
@@ -232,6 +232,7 @@ int setup_and_run(Display *display, xcb_connection_t *connection,
         xcb_destroy_window(connection, window);
         glXDestroyContext(display, context);
 
+        // FIXME(mick): What the fuck.
         fprintf(stderr, "glXDestroyContext failed\n");
         return -1;
     }
@@ -276,60 +277,82 @@ int setup_and_run(Display *display, xcb_connection_t *connection,
 }
 
 int main(int argc, char *argv[]) {
-    Display *display;
-    int default_screen;
+    int exit_code = 0;
 
-    /* Open Xlib Display */
-    display = XOpenDisplay(0);
-    if (!display) {
-        fprintf(stderr, "Can't open display\n");
-        return -1;
-    }
+    do {
+        Display *display = XOpenDisplay(0);
 
-    default_screen = DefaultScreen(display);
+        if (!display) {
+            fprintf(stderr, "Can't open display\n");
+            exit_code = -1;
+            break;
+        }
 
-    /* Get the XCB connection from the display */
-    xcb_connection_t *connection = XGetXCBConnection(display);
-    if (!connection) {
+        do {
+            xcb_connection_t *connection = XGetXCBConnection(display);
+
+            if (!connection) {
+                fprintf(stderr, "Can't get xcb connection from display\n");
+                exit_code = -1;
+                break;
+            }
+
+            XSetEventQueueOwner(display, XCBOwnsEventQueue);
+
+            // Query Atom values.
+            {
+                xcb_intern_atom_cookie_t wm_protocols_cookie = xcb_intern_atom(
+                    connection, False, sizeof(WM_PROTOCOLS), WM_PROTOCOLS);
+                xcb_intern_atom_cookie_t wm_delete_window_cookie =
+                    xcb_intern_atom(connection, False, sizeof(WM_DELETE_WINDOW),
+                                    WM_DELETE_WINDOW);
+
+                xcb_intern_atom_reply_t *wm_protocols_reply =
+                    xcb_intern_atom_reply(connection, wm_protocols_cookie,
+                                          NULL);
+                wm_protocols = wm_protocols_reply->atom;
+                free(wm_protocols_reply);
+
+                xcb_intern_atom_reply_t *wm_delete_window_reply =
+                    xcb_intern_atom_reply(connection, wm_delete_window_cookie,
+                                          NULL);
+                wm_delete_window = wm_delete_window_reply->atom;
+                free(wm_delete_window_reply);
+            }
+
+            // Find XCB screen.
+            int default_screen_number = XDefaultScreen(display);
+
+            xcb_screen_t *screen = NULL;
+            xcb_screen_iterator_t iter =
+                xcb_setup_roots_iterator(xcb_get_setup(connection));
+            int index = 0;
+            do {
+                if (index == default_screen_number) {
+                    screen = iter.data;
+                    break;
+                }
+                if (iter.rem > 0) {
+                    index += 1;
+                    xcb_screen_next(&iter);
+                    continue;
+                }
+            } while (0);
+
+            if (!screen) {
+                fprintf(stderr, "Failed to find screen from screen number.\n");
+                exit_code = -1;
+                break;
+            }
+
+            exit_code = setup_and_run(display, connection,
+                                      default_screen_number, screen);
+
+            // xcb_disconnect is called by XCloseDIsplay.
+        } while (0);
+
         XCloseDisplay(display);
-        fprintf(stderr, "Can't get xcb connection from display\n");
-        return -1;
-    }
+    } while (0);
 
-    /* Acquire event queue ownership */
-    XSetEventQueueOwner(display, XCBOwnsEventQueue);
-
-    {
-        xcb_intern_atom_cookie_t wm_protocols_cookie = xcb_intern_atom(
-            connection, False, sizeof(WM_PROTOCOLS), WM_PROTOCOLS);
-        xcb_intern_atom_cookie_t wm_delete_window_cookie = xcb_intern_atom(
-            connection, False, sizeof(WM_DELETE_WINDOW), WM_DELETE_WINDOW);
-
-        xcb_intern_atom_reply_t *wm_protocols_reply =
-            xcb_intern_atom_reply(connection, wm_protocols_cookie, NULL);
-        wm_protocols = wm_protocols_reply->atom;
-        free(wm_protocols_reply);
-
-        xcb_intern_atom_reply_t *wm_delete_window_reply =
-            xcb_intern_atom_reply(connection, wm_delete_window_cookie, NULL);
-        wm_delete_window = wm_delete_window_reply->atom;
-        free(wm_delete_window_reply);
-    }
-
-    /* Find XCB screen */
-    xcb_screen_t *screen = 0;
-    xcb_screen_iterator_t screen_iter =
-        xcb_setup_roots_iterator(xcb_get_setup(connection));
-    for (int screen_num = default_screen; screen_iter.rem && screen_num > 0;
-         --screen_num, xcb_screen_next(&screen_iter))
-        ;
-    screen = screen_iter.data;
-
-    /* Initialize window and OpenGL context, run main loop and deinitialize */
-    int retval = setup_and_run(display, connection, default_screen, screen);
-
-    /* Cleanup */
-    XCloseDisplay(display);
-
-    return retval;
+    return exit_code;
 }
