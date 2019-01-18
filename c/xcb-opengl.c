@@ -185,95 +185,93 @@ int setup_and_run(Display *display, xcb_connection_t *connection,
     GLXFBConfig fb_config = fb_configs[0];
     glXGetFBConfigAttrib(display, fb_config, GLX_VISUAL_ID, &visualID);
 
-    GLXContext context;
+    int exit_code = 0;
 
-    /* Create OpenGL context */
-    context = glXCreateNewContext(display, fb_config, GLX_RGBA_TYPE, 0, True);
-    if (!context) {
-        fprintf(stderr, "glXCreateNewContext failed\n");
-        return -1;
-    }
+    do {
+        /* Create OpenGL context */
+        GLXContext context =
+            glXCreateNewContext(display, fb_config, GLX_RGBA_TYPE, 0, True);
+        if (!context) {
+            fprintf(stderr, "glXCreateNewContext failed\n");
+            exit_code = -1;
+            break;
+        }
 
-    /* Create XID's for colormap and window */
-    xcb_colormap_t colormap = xcb_generate_id(connection);
-    xcb_window_t window = xcb_generate_id(connection);
+        /* Create XID's for colormap and window */
+        do {
 
-    /* Create colormap */
-    xcb_create_colormap(connection, XCB_COLORMAP_ALLOC_NONE, colormap,
-                        screen->root, visualID);
+            xcb_colormap_t colormap = xcb_generate_id(connection);
+            {
+                xcb_create_colormap(connection, XCB_COLORMAP_ALLOC_NONE,
+                                    colormap, screen->root, visualID);
+            }
 
-    /* Create window */
-    uint32_t eventmask = XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_KEY_PRESS |
-                         XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
-                         XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT;
-    uint32_t valuelist[] = {eventmask, colormap, 0};
-    uint32_t valuemask = XCB_CW_EVENT_MASK | XCB_CW_COLORMAP;
+            xcb_window_t window = xcb_generate_id(connection);
+            {
+                uint32_t eventmask = XCB_EVENT_MASK_EXPOSURE |
+                                     XCB_EVENT_MASK_KEY_PRESS |
+                                     XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
+                                     XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT;
+                uint32_t valuelist[] = {eventmask, colormap, 0};
+                uint32_t valuemask = XCB_CW_EVENT_MASK | XCB_CW_COLORMAP;
+                xcb_create_window(connection, XCB_COPY_FROM_PARENT, window,
+                                  screen->root, 0, 0, 150, 150, 0,
+                                  XCB_WINDOW_CLASS_INPUT_OUTPUT, visualID,
+                                  valuemask, valuelist);
+            }
 
-    xcb_create_window(connection, XCB_COPY_FROM_PARENT, window, screen->root, 0,
-                      0, 150, 150, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT, visualID,
-                      valuemask, valuelist);
+            // NOTE(mick): Don't know if this'll work.
+            {
+                Atom protocols[] = {wm_delete_window};
+                const int protocols_len = sizeof(protocols) / sizeof(Atom);
+                XSetWMProtocols(display, window, protocols, protocols_len);
+            }
 
-    // NOTE(mick): Don't know if this'll work.
-    {
-        Atom protocols[] = {wm_delete_window};
-        const int protocols_len = sizeof(protocols) / sizeof(Atom);
-        XSetWMProtocols(display, window, protocols, protocols_len);
-    }
+            // NOTE: window must be mapped before glXMakeContextCurrent
+            xcb_map_window(connection, window);
 
-    // NOTE: window must be mapped before glXMakeContextCurrent
-    xcb_map_window(connection, window);
+            GLXWindow glx_window =
+                glXCreateWindow(display, fb_config, window, 0);
 
-    /* Create GLX Window */
-    GLXDrawable drawable = 0;
+            if (!glx_window) {
+                fprintf(stderr, "glXCreateWindow failed.\n");
+                exit_code = -1;
+                break;
+            }
 
-    GLXWindow glxwindow = glXCreateWindow(display, fb_config, window, 0);
+            {
+                uint32_t interval;
+                glXQueryDrawable(display, glx_window, GLX_SWAP_INTERVAL_EXT,
+                                 &interval);
+                printf("VSYNC interval: %d\n", interval);
+            }
 
-    if (!window) {
-        xcb_destroy_window(connection, window);
+            {
+                uint32_t interval;
+                glXQueryDrawable(display, glx_window, GLX_MAX_SWAP_INTERVAL_EXT,
+                                 &interval);
+                printf("VSYNC max interval: %d\n", interval);
+            }
+
+            glXSwapIntervalEXT(display, glx_window, 1);
+
+            if (!glXMakeContextCurrent(display, glx_window, glx_window,
+                                       context)) {
+                fprintf(stderr, "glXMakeContextCurrent failed.\n");
+                exit_code = -1;
+                break;
+            }
+
+            exit_code = main_loop(display, connection, window, glx_window);
+
+            glXDestroyWindow(display, glx_window);
+            xcb_destroy_window(connection, window);
+        } while (0);
+
         glXDestroyContext(display, context);
+    } while (0);
 
-        // FIXME(mick): What the fuck.
-        fprintf(stderr, "glXDestroyContext failed\n");
-        return -1;
-    }
-
-    drawable = glxwindow;
-
-    {
-        uint32_t interval;
-        glXQueryDrawable(display, drawable, GLX_SWAP_INTERVAL_EXT, &interval);
-        printf("VSYNC interval: %d\n", interval);
-    }
-
-    {
-        uint32_t interval;
-        glXQueryDrawable(display, drawable, GLX_MAX_SWAP_INTERVAL_EXT,
-                         &interval);
-        printf("VSYNC max interval: %d\n", interval);
-    }
-
-    glXSwapIntervalEXT(display, drawable, 1);
-
-    /* make OpenGL context current */
-    if (!glXMakeContextCurrent(display, drawable, drawable, context)) {
-        xcb_destroy_window(connection, window);
-        glXDestroyContext(display, context);
-
-        fprintf(stderr, "glXMakeContextCurrent failed\n");
-        return -1;
-    }
-
-    /* run main loop */
-    int retval = main_loop(display, connection, window, drawable);
-
-    /* Cleanup */
-    glXDestroyWindow(display, glxwindow);
-
-    xcb_destroy_window(connection, window);
-
-    glXDestroyContext(display, context);
-
-    return retval;
+    return exit_code;
 }
 
 int main(int argc, char *argv[]) {
