@@ -160,9 +160,10 @@ int main_loop(Display *display, xcb_connection_t *connection,
         }
 
         if (frame_count % 60 == 0) {
-            printf("frame: %8luns, update: %8luns, draw: %8luns\n",
-                   duration_nsec(frame_elapsed), duration_nsec(update_elapsed),
-                   duration_nsec(draw_elapsed));
+            // printf("frame: %8luns, update: %8luns, draw: %8luns\n",
+            //        duration_nsec(frame_elapsed),
+            //        duration_nsec(update_elapsed),
+            //        duration_nsec(draw_elapsed));
         }
 
         frame_count += 1;
