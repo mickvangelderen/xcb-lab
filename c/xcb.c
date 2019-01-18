@@ -46,6 +46,9 @@ uint64_t duration_nsec(Duration duration) {
     return duration.tv_sec * NS_PER_S + duration.tv_nsec;
 }
 
+const uint8_t WM_PROTOCOLS_STRING[] = "WM_PROTOCOLS";
+const char WM_DELETE_WINDOW_STRING[] = "WM_DELETE_WINDOW";
+
 int main() {
     xcb_connection_t *c = xcb_connect(0, 0);
     xcb_screen_t *s = xcb_setup_roots_iterator(xcb_get_setup(c)).data;
@@ -55,12 +58,14 @@ int main() {
                       XCB_WINDOW_CLASS_INPUT_OUTPUT, (*s).root_visual,
                       XCB_CW_EVENT_MASK, &values);
 
-    xcb_intern_atom_cookie_t cookie = xcb_intern_atom(c, 1, 12, "WM_PROTOCOLS");
+    xcb_intern_atom_cookie_t cookie = xcb_intern_atom(
+        c, 0, sizeof(WM_PROTOCOLS_STRING) - 1, WM_PROTOCOLS_STRING);
+    xcb_intern_atom_cookie_t cookie2 = xcb_intern_atom(
+        c, 0, sizeof(WM_DELETE_WINDOW_STRING) - 1, WM_DELETE_WINDOW_STRING);
     xcb_intern_atom_reply_t *reply = xcb_intern_atom_reply(c, cookie, 0);
-
-    xcb_intern_atom_cookie_t cookie2 =
-        xcb_intern_atom(c, 0, 16, "WM_DELETE_WINDOW");
     xcb_intern_atom_reply_t *reply2 = xcb_intern_atom_reply(c, cookie2, 0);
+    printf("wm_protocols = %d\n", reply->atom);
+    printf("wm_delete_window = %d\n", reply2->atom);
 
     xcb_change_property(c, XCB_PROP_MODE_REPLACE, w, (*reply).atom, 4, 32, 1,
                         &(*reply2).atom);
