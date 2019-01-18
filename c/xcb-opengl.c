@@ -102,6 +102,7 @@ void draw() {
 int main_loop(Display *display, xcb_connection_t *connection,
               xcb_window_t window, GLXDrawable drawable) {
     int running = 1;
+    uint64_t frame_count = 0;
     Instant frame_start = time_now();
 
     while (running) {
@@ -109,7 +110,8 @@ int main_loop(Display *display, xcb_connection_t *connection,
         Instant update_start = time_now();
         xcb_generic_event_t *event;
         while ((event = xcb_poll_for_event(connection))) {
-            switch (event->response_type & ~0x80) {
+            // NOTE(mickvangelderen): Used to mask by & ~0x80, not sure why.
+            switch (event->response_type) {
             case XCB_KEY_PRESS:
                 /* Quit on key press */
                 running = 0;
@@ -118,11 +120,11 @@ int main_loop(Display *display, xcb_connection_t *connection,
                 // We are drawing continuously.
                 break;
             case XCB_CLIENT_MESSAGE: {
-                printf("xcb_client_message\n");
-                abort();
-                running = 0;
+                // FIXME(mickvangelderen): Not getting any of these :'(
                 xcb_client_message_event_t *e =
                     (xcb_client_message_event_t *)event;
+
+                printf("xcb_client_message %d\n", e->response_type);
                 if (e->data.data32[0] == wm_delete_window) {
                     running = 0;
                 }
@@ -130,7 +132,7 @@ int main_loop(Display *display, xcb_connection_t *connection,
             }
             default:
                 printf("event %d\n", event->response_type);
-                abort();
+                /* abort(); */
                 break;
             }
 
@@ -157,9 +159,13 @@ int main_loop(Display *display, xcb_connection_t *connection,
             /* abort(); */
         }
 
-        printf("frame: %8luns, update: %8luns, draw: %8luns\n",
-               duration_nsec(frame_elapsed), duration_nsec(update_elapsed),
-               duration_nsec(draw_elapsed));
+        if (frame_count % 60 == 0) {
+            printf("frame: %8luns, update: %8luns, draw: %8luns\n",
+                   duration_nsec(frame_elapsed), duration_nsec(update_elapsed),
+                   duration_nsec(draw_elapsed));
+        }
+
+        frame_count += 1;
     }
 
     return 0;
@@ -210,6 +216,7 @@ int setup_and_run(Display *display, xcb_connection_t *connection,
             {
                 uint32_t eventmask = XCB_EVENT_MASK_EXPOSURE |
                                      XCB_EVENT_MASK_KEY_PRESS |
+                                     XCB_EVENT_MASK_STRUCTURE_NOTIFY |
                                      XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
                                      XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT;
                 uint32_t valuelist[] = {eventmask, colormap, 0};
