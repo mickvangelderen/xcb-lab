@@ -216,6 +216,7 @@ int setup_and_run(Display *display, xcb_connection_t *connection,
             {
                 uint32_t eventmask = XCB_EVENT_MASK_EXPOSURE |
                                      XCB_EVENT_MASK_KEY_PRESS |
+                                     XCB_EVENT_MASK_BUTTON_PRESS |
                                      XCB_EVENT_MASK_STRUCTURE_NOTIFY |
                                      XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
                                      XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT;
