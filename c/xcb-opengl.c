@@ -319,9 +319,10 @@ int main(int argc, char *argv[]) {
             // Query Atom values.
             {
                 xcb_intern_atom_cookie_t wm_protocols_cookie = xcb_intern_atom(
-                    connection, False, sizeof(WM_PROTOCOLS), WM_PROTOCOLS);
+                    connection, False, sizeof(WM_PROTOCOLS) - 1, WM_PROTOCOLS);
                 xcb_intern_atom_cookie_t wm_delete_window_cookie =
-                    xcb_intern_atom(connection, False, sizeof(WM_DELETE_WINDOW),
+                    xcb_intern_atom(connection, False,
+                                    sizeof(WM_DELETE_WINDOW) - 1,
                                     WM_DELETE_WINDOW);
 
                 xcb_intern_atom_reply_t *wm_protocols_reply =
