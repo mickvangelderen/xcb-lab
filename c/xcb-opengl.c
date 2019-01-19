@@ -96,8 +96,8 @@ void draw() {
     glClear(GL_COLOR_BUFFER_BIT);
 }
 
-#define WM_PROTOCOLS "WM_PROTOCOLS"
-#define WM_DELETE_WINDOW "WM_DELETE_WINDOW"
+const char WM_PROTOCOLS[] = "WM_PROTOCOLS";
+const char WM_DELETE_WINDOW[] = "WM_DELETE_WINDOW";
 
 int main_loop(Display *display, xcb_connection_t *connection,
               xcb_window_t window, GLXDrawable drawable) {
