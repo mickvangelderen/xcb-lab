@@ -88,8 +88,8 @@ static int visual_attribs[] = {
     // GLX_SAMPLES         , 4,
     None};
 
-static Atom wm_protocols;
-static Atom wm_delete_window;
+static xcb_atom_t wm_protocols;
+static xcb_atom_t wm_delete_window;
 
 void draw() {
     glClearColor(0.2, 0.4, 0.9, 1.0);
@@ -241,8 +241,8 @@ int setup_and_run(Display *display, xcb_connection_t *connection,
 
             // NOTE(mick): Don't know if this'll work.
             {
-                Atom protocols[] = {wm_delete_window};
-                const int protocols_len = sizeof(protocols) / sizeof(Atom);
+                xcb_atom_t protocols[] = {wm_delete_window};
+                const int protocols_len = sizeof(protocols) / sizeof(xcb_atom_t);
                 XSetWMProtocols(display, window, protocols, protocols_len);
             }
 
@@ -316,7 +316,7 @@ int main(int argc, char *argv[]) {
 
             XSetEventQueueOwner(display, XCBOwnsEventQueue);
 
-            // Query Atom values.
+            // Query xcb_atom_t values.
             {
                 xcb_intern_atom_cookie_t wm_protocols_cookie = xcb_intern_atom(
                     connection, False, sizeof(WM_PROTOCOLS) - 1, WM_PROTOCOLS);
