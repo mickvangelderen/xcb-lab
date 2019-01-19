@@ -133,9 +133,8 @@ int main_loop(Display *display, xcb_connection_t *connection,
                 // FIXME(mickvangelderen): Not getting any of these :'(
                 xcb_client_message_event_t *e =
                     (xcb_client_message_event_t *)event;
-
-                printf("xcb_client_message %d\n", e->response_type);
-                if (e->data.data32[0] == wm_delete_window) {
+                printf("%d, %d, %d\n", e->format, e->type, e->data.data32[0]);
+                if (e->type == wm_protocols && e->format == 32 && e->data.data32[0] == wm_delete_window) {
                     running = 0;
                 }
                 break;
