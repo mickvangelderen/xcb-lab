@@ -338,6 +338,9 @@ int main(int argc, char *argv[]) {
                 free(wm_delete_window_reply);
             }
 
+            printf("wm_protocols = %d\n", wm_protocols);
+            printf("wm_delete_window = %d\n", wm_delete_window);
+
             // Find XCB screen.
             int default_screen_number = XDefaultScreen(display);
 
