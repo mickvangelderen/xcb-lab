@@ -160,14 +160,6 @@ int main_loop(Display *display, xcb_connection_t *connection,
         Duration frame_elapsed = instant_sub(frame_end, frame_start);
         frame_start = frame_end;
 
-        if (duration_nsec(frame_elapsed) < 10000) {
-            // NOTE(mick): I can't figure out how to get a close event
-            // and properly stop the loop when the close button on the
-            // window is clicked. If the frame is suddenly super short
-            // it is probably not actually updating and drawing anymore.
-            /* abort(); */
-        }
-
         if (frame_count % 60 == 0) {
             // printf("frame: %8luns, update: %8luns, draw: %8luns\n",
             //        duration_nsec(frame_elapsed),
